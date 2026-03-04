@@ -111,9 +111,32 @@ input[type=number]{-moz-appearance:textfield}
 .tx-del:active{opacity:1}
 
 /* FILTER */
-.filter-row{display:flex;gap:6px;margin-bottom:13px}
+.filter-row{display:flex;gap:6px;margin-bottom:13px;flex-wrap:wrap}
 .filter-tab{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--text3);font-family:inherit;transition:all .15s}
 .filter-tab.active{border-color:var(--accent);background:rgba(123,104,238,.15);color:#c0b8ff}
+
+/* YEAR/MONTH PICKER */
+.period-bar{display:flex;align-items:center;gap:0;margin-bottom:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.period-year-btn{padding:6px 4px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:700;color:var(--text3);font-family:inherit;transition:color .15s;white-space:nowrap;flex-shrink:0}
+.period-year-btn.active{color:#c0b8ff}
+.period-months{display:flex;gap:5px;overflow-x:auto;flex:1;padding:0 2px}
+.period-month-btn{padding:5px 10px;border-radius:20px;border:1px solid var(--border);background:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--text3);font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.period-month-btn.active{border-color:var(--accent);background:rgba(123,104,238,.15);color:#c0b8ff}
+.period-all-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--text3);font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.period-all-btn.active{border-color:var(--accent);background:rgba(123,104,238,.15);color:#c0b8ff}
+
+/* MONTH GROUP */
+.month-group-header{display:flex;justify-content:space-between;align-items:center;padding:8px 0 5px;margin-top:4px}
+.month-group-label{font-size:11px;font-weight:700;color:var(--text2)}
+.month-group-sum{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* STOCK DETAIL INFO */
+.stock-info-box{background:#0d0d1e;border:1px solid var(--border2);border-radius:10px;padding:11px 13px;margin-bottom:10px}
+.stock-info-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.stock-info-label{font-size:11px;color:var(--text3)}
+.stock-info-value{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text2)}
+.stock-info-row.highlight .stock-info-value{color:var(--text);font-size:13px}
+.stock-info-divider{border:none;border-top:1px solid var(--border2);margin:5px 0}
 
 /* BALANCE */
 .balance-row{display:flex;align-items:center;gap:9px;margin-bottom:13px}
@@ -478,7 +501,9 @@ let FS = { type:'income', method:'toss', date:today(), cat:'급여', amount:'', 
 /* ═══════════════════════════════════════
    TX FILTER
 ═══════════════════════════════════════ */
-let txF = 'all';
+let txF = 'all'; // 'all' | 'income' | 'expense'
+let txYear = 'all'; // 'all' | '2024' | '2025'
+let txMonth = 'all'; // 'all' | '01'..'12'
 
 /* ═══════════════════════════════════════
    RENDER
@@ -589,6 +614,8 @@ function pageTx() {
   </div>`;
 }
 window.setTxF = function(f) { txF=f; render(); };
+window.setTxYear = function(y) { txYear=y; txMonth='all'; render(); };
+window.setTxPeriod = function(y,m) { txYear=y; txMonth=m; render(); };
 
 /* ── BALANCE PAGE ── */
 function pageBalance() {
@@ -655,19 +682,24 @@ function broker(br, label) {
     <div class="broker-header"><div class="broker-title">${label}</div><button class="btn-sm" onclick="openSM('${br}',null)">+ 추가</button></div>
     ${items.length===0?'<div class="empty" style="padding:10px 0">종목 없음</div>':`
     <div class="stock-scroll"><table class="stock-table">
-      <tr><th>종목</th><th>수량</th><th>현재가</th><th>평가금액</th><th>수익률</th><th></th></tr>
+      <tr><th>종목</th><th style='text-align:right'>수량</th><th style='text-align:right'>현재가</th><th style='text-align:right'>평가금액(원)</th><th style='text-align:right'>손익/수익률</th><th></th></tr>
       ${items.map(s=>{
         const us=s.currency==='USD';
         const ev=us?n(s.currentPrice)*n(s.currentRate)*n(s.qty):n(s.currentPrice)*n(s.qty);
         const buy=us?n(s.buyPrice)*n(s.buyRate)*n(s.qty):n(s.buyPrice)*n(s.qty);
         const pnl=ev-buy, rate=buy?((pnl/buy)*100).toFixed(1):0;
+        const currPriceDisp = us
+          ? `${fmtUSD(s.currentPrice)}<br><span style="font-size:10px;color:var(--text3)">(환율 ${fmtN(s.currentRate)})</span>`
+          : fmt(s.currentPrice);
         return `<tr>
           <td>${s.name}${us?'<span style="font-size:9px;color:var(--blue);margin-left:2px">US</span>':''}</td>
-          <td>${fmtN(s.qty)}</td>
-          <td>${us?fmtUSD(s.currentPrice):fmt(s.currentPrice)}</td>
-          <td>${fmt(ev)}</td>
-          <td style="color:${pnl>=0?'var(--green)':'var(--red)'};font-weight:800">${pnl>=0?'+':''}${rate}%</td>
-          <td><button class="btn-text" style="color:var(--accent);font-size:11px" onclick="openSM('${br}','${s.id}')">수정</button> <button class="btn-text" style="color:var(--red);font-size:11px" onclick="delSt('${br}','${s.id}')">삭제</button></td>
+          <td style="text-align:right">${fmtN(s.qty)}</td>
+          <td style="text-align:right;line-height:1.4">${currPriceDisp}</td>
+          <td style="text-align:right">${fmt(ev)}</td>
+          <td style="color:${pnl>=0?'var(--green)':'var(--red)'};font-weight:800;text-align:right">
+            ${fmt(pnl)}<br><span style="font-size:10px">${pnl>=0?'+':''}${rate}%</span>
+          </td>
+          <td><button class="btn-text" style="color:var(--accent);font-size:11px" onclick="openSM('${br}','${s.id}')">수정</button><br><button class="btn-text" style="color:var(--red);font-size:11px" onclick="delSt('${br}','${s.id}')">삭제</button></td>
         </tr>`;
       }).join('')}
     </table></div>`}
@@ -707,29 +739,61 @@ window.closeSM = function() { document.getElementById('sModal').style.display='n
 
 window.renderSM = function() {
   const f=MF, us=f.currency==='USD';
-  const bKRW=us?n(f.buyPrice)*n(f.buyRate)*n(f.qty):n(f.buyPrice)*n(f.qty);
-  const cKRW=us?n(f.currentPrice)*n(f.currentRate)*n(f.qty):n(f.currentPrice)*n(f.qty);
+
+  // Buy calculation
+  const buyPriceKRW = us ? n(f.buyPrice)*n(f.buyRate) : n(f.buyPrice); // per share in KRW
+  const bKRW = buyPriceKRW * n(f.qty); // total buy in KRW
+
+  // Current calculation
+  const currPriceKRW = us ? n(f.currentPrice)*n(f.currentRate) : n(f.currentPrice);
+  const cKRW = currPriceKRW * n(f.qty);
+
   const pnl=cKRW-bKRW, rate=bKRW?((pnl/bKRW)*100).toFixed(2):0;
-  const showP=f.buyPrice&&f.qty&&f.currentPrice&&(!us||(f.buyRate&&f.currentRate));
+
+  const hasBuyInfo = f.buyPrice && f.qty && (!us || f.buyRate);
+  const hasCurrInfo = f.currentPrice && f.qty && (!us || f.currentRate);
+  const showPreview = hasBuyInfo && hasCurrInfo;
+
   document.getElementById('sMBody').innerHTML=`
     <div class="form-group"><label class="form-label">종목명</label><input class="form-input" type="text" value="${f.name||''}" oninput="MF.name=this.value" placeholder="예: 삼성전자, NVDA"></div>
     <div class="form-row">
       <div><label class="form-label">수량</label><input class="form-input" type="number" inputmode="decimal" value="${f.qty||''}" oninput="MF.qty=this.value;renderSM()" placeholder="0"></div>
       <div><label class="form-label">화폐</label><div class="toggle-group" style="margin:0"><button class="toggle-btn ${!us?'on-krw':''}" style="padding:9px 0;font-size:12px" onclick="MF.currency='KRW';renderSM()">🇰🇷 KRW</button><button class="toggle-btn ${us?'on-usd':''}" style="padding:9px 0;font-size:12px" onclick="MF.currency='USD';renderSM()">🇺🇸 USD</button></div></div>
     </div>
-    <div class="form-row">
-      <div><label class="form-label">매수 단가${us?' (USD)':' (원)'}</label><input class="form-input" type="number" inputmode="decimal" value="${f.buyPrice||''}" oninput="MF.buyPrice=this.value;renderSM()" placeholder="0"></div>
-      ${us?`<div><label class="form-label">매수 환율</label><input class="form-input" type="number" inputmode="decimal" value="${f.buyRate||''}" oninput="MF.buyRate=this.value;renderSM()" placeholder="1300"></div>`:'<div></div>'}
+
+    ${us ? `<div style="background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.2);border-radius:12px;padding:13px;margin-bottom:11px">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:10px">📥 매수 정보</div>
+      <div class="form-row" style="margin-bottom:9px">
+        <div><label class="form-label">매수 단가 (USD)</label><input class="form-input" type="number" inputmode="decimal" value="${f.buyPrice||''}" oninput="MF.buyPrice=this.value;renderSM()" placeholder="0.00"></div>
+        <div><label class="form-label">매수 당시 환율</label><input class="form-input" type="number" inputmode="decimal" value="${f.buyRate||''}" oninput="MF.buyRate=this.value;renderSM()" placeholder="1300"></div>
+      </div>
+      ${hasBuyInfo ? `<div class="stock-info-box" style="margin-bottom:0">
+        <div class="stock-info-row"><span class="stock-info-label">주당 매수단가 (원화 환산)</span><span class="stock-info-value">${fmt(buyPriceKRW)}/주</span></div>
+        <div class="stock-info-row highlight"><span class="stock-info-label">총 매수금액 (원화)</span><span class="stock-info-value">${fmt(bKRW)}</span></div>
+      </div>` : ''}
     </div>
-    <div class="form-row">
-      <div><label class="form-label">현재가${us?' (USD)':' (원)'}</label><input class="form-input" type="number" inputmode="decimal" value="${f.currentPrice||''}" oninput="MF.currentPrice=this.value;renderSM()" placeholder="0"></div>
-      ${us?`<div><label class="form-label">현재 환율</label><input class="form-input" type="number" inputmode="decimal" value="${f.currentRate||''}" oninput="MF.currentRate=this.value;renderSM()" placeholder="1300"></div>`:'<div></div>'}
-    </div>
-    ${showP?`<div class="modal-preview">
-      <div class="modal-preview-row"><span style="color:var(--text3)">매수금액</span><span>${fmt(bKRW)}</span></div>
-      <div class="modal-preview-row"><span style="color:var(--text3)">현재평가</span><span>${fmt(cKRW)}</span></div>
-      <div class="modal-preview-row"><span style="color:var(--text3)">손익</span><span style="color:${pnl>=0?'var(--green)':'var(--red)'};font-weight:800">${pnl>=0?'+':''}${fmt(pnl)} (${rate}%)</span></div>
-    </div>`:''}
+    <div style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:12px;padding:13px;margin-bottom:11px">
+      <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:10px">📊 현재 정보</div>
+      <div class="form-row" style="margin-bottom:9px">
+        <div><label class="form-label">현재가 (USD)</label><input class="form-input" type="number" inputmode="decimal" value="${f.currentPrice||''}" oninput="MF.currentPrice=this.value;renderSM()" placeholder="0.00"></div>
+        <div><label class="form-label">현재 환율</label><input class="form-input" type="number" inputmode="decimal" value="${f.currentRate||''}" oninput="MF.currentRate=this.value;renderSM()" placeholder="1300"></div>
+      </div>
+      ${hasCurrInfo ? `<div class="stock-info-box" style="margin-bottom:0">
+        <div class="stock-info-row"><span class="stock-info-label">현재 주당 단가 (원화)</span><span class="stock-info-value">${fmt(currPriceKRW)}/주</span></div>
+        <div class="stock-info-row highlight"><span class="stock-info-label">현재 평가금액 (원화)</span><span class="stock-info-value">${fmt(cKRW)}</span></div>
+      </div>` : ''}
+    </div>` :
+    `<div class="form-row">
+      <div><label class="form-label">매수 단가 (원)</label><input class="form-input" type="number" inputmode="decimal" value="${f.buyPrice||''}" oninput="MF.buyPrice=this.value;renderSM()" placeholder="0"></div>
+      <div><label class="form-label">현재가 (원)</label><input class="form-input" type="number" inputmode="decimal" value="${f.currentPrice||''}" oninput="MF.currentPrice=this.value;renderSM()" placeholder="0"></div>
+    </div>`}
+
+    ${showPreview ? `<div class="modal-preview">
+      ${us ? '' : `<div class="modal-preview-row"><span style="color:var(--text3)">총 매수금액</span><span>${fmt(bKRW)}</span></div>`}
+      ${us ? '' : `<div class="modal-preview-row"><span style="color:var(--text3)">현재 평가금액</span><span>${fmt(cKRW)}</span></div>`}
+      <div class="modal-preview-row"><span style="color:var(--text3)">손익 (원화)</span><span style="color:${pnl>=0?'var(--green)':'var(--red)'};font-weight:800">${pnl>=0?'+':''}${fmt(pnl)}</span></div>
+      <div class="modal-preview-row"><span style="color:var(--text3)">수익률</span><span style="color:${pnl>=0?'var(--green)':'var(--red)'};font-weight:800">${pnl>=0?'+':''}${rate}%</span></div>
+    </div>` : ''}
     <div class="modal-btns"><button class="btn-cancel" onclick="closeSM()">취소</button><button class="btn-primary" style="flex:1" onclick="saveSt()">저장</button></div>`;
 };
 
